@@ -1,0 +1,10 @@
+.env
+.venv
+.DS_Store
+.env.*
+.vscode
+
+frontend/node_modules
+frontend/build
+frontend/dist
+frontend/.next
