@@ -7,6 +7,8 @@ from langgraph.types import interrupt
 from agent.prompts import PLANNER_NODE_SYSTEM_PROMPT
 from agent.state import AgentState, PlannerOutput, Route
 
+from dotenv import load_dotenv
+load_dotenv()
 
 @lru_cache(maxsize=1)
 def _planner_model():

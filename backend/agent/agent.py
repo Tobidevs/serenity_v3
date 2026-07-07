@@ -1,6 +1,6 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-
+import uuid
 from agent.nodes import (
     planner_node,
     report_generation,
@@ -40,3 +40,11 @@ def build_graph() -> StateGraph:
 # MemorySaver is required for interrupt()/resume to work. It is in-memory only;
 # swap for a persistent checkpointer (e.g. Postgres) for production.
 graph = build_graph().compile(checkpointer=MemorySaver())
+
+def run_agent(message: str, config: dict) -> str:
+    state = graph.invoke({"messages": [{"role": "user", "content": message}]}, config=config)
+    return state
+
+if __name__ == "__main__":
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    print(run_agent("What is predestination?", config))
