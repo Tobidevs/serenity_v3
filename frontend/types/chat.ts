@@ -16,6 +16,8 @@ export interface ChatMessage {
   content: string;
   /** When true, the assistant text reveals token-by-token with a fade. */
   streaming?: boolean;
+  /** When true, the assistant reply is still being fetched — show a typing indicator. */
+  pending?: boolean;
   /**
    * Optional pre-rendered rich content (lists, headings, emphasis).
    * When present it is rendered as-is instead of `content` and is NOT

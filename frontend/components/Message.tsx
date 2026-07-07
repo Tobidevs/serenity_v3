@@ -40,7 +40,13 @@ export default function Message({ message, onStreamDone }: MessageProps) {
       )}
 
       <div className="font-serif text-[17px] font-normal leading-[1.68] tracking-[-0.003em] text-cream/95 sm:text-[18.5px]">
-        {message.node ? (
+        {message.pending ? (
+          <span className="inline-flex items-center gap-1.5 py-1" aria-label="Assistant is thinking">
+            <span className="h-2 w-2 animate-token-in rounded-full bg-gold/70 [animation-delay:0ms]" />
+            <span className="h-2 w-2 animate-token-in rounded-full bg-gold/70 [animation-delay:150ms]" />
+            <span className="h-2 w-2 animate-token-in rounded-full bg-gold/70 [animation-delay:300ms]" />
+          </span>
+        ) : message.node ? (
           message.node
         ) : (
           <p className="m-0">
