@@ -19,7 +19,7 @@ app = FastAPI(title="Serenity Backend")
 # Allow the Next.js frontend (a separate origin) to call the API from the
 # browser. Override the allowed origins with CORS_ALLOW_ORIGINS (comma-sep).
 _cors_origins = os.getenv(
-    "CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    "CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001"
 )
 app.add_middleware(
     CORSMiddleware,

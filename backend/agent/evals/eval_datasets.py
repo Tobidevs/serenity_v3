@@ -1,0 +1,59 @@
+from braintrust import EvalCase
+from langchain_core.messages import SystemMessage, HumanMessage
+
+PLANNER_DATASET = [
+    {
+        "messages": [
+            HumanMessage(
+                content="What verse or passage do catholics use to support the immaculate conception?"
+            )
+        ],
+        "current_query": "What verse or passage do catholics use to support the immaculate conception?",
+        "expected": {
+            "route": "continue_to_supervisor",
+            "refined_query": (
+                "What specific Bible verses or scriptural passages do Catholics cite "
+                "in support of the doctrine of the Immaculate Conception?"
+            ),
+            "clarification_request": "",
+            "plan": {
+                "steps": [
+                    {
+                        "step_number": "1",
+                        "tool": "subagent",
+                        "step_name": "Dispatch research subagent(s) on Catholic scriptural support",
+                        "description": (
+                            "Research what scriptural passages the Catholic tradition cites in "
+                            "support of the Immaculate Conception doctrine. A single subagent "
+                            "covering the Catholic position is sufficient; a second subagent may "
+                            "optionally be dispatched to surface how the passages are read outside "
+                            "that tradition,"
+                        ),
+                    },
+                    {
+                        "step_number": "2",
+                        "tool": "bible_api",
+                        "step_name": "Call Bible API on cited verses",
+                        "description": (
+                            "For each specific verse or passage identified by Step 1's research, "
+                            "call the Bible API to retrieve its full text for accurate citation. "
+                            "Do not call the Bible API on any verse that was not first surfaced by "
+                            "Step 1's research."
+                        ),
+                    },
+                ]
+            },
+        },
+    }
+]
+
+
+def build_planner_dataset():
+    for data in PLANNER_DATASET:
+        EvalCase(
+            input={
+                "query": data["current_query"],
+                "messages": data.get("messages", []),
+            },
+            expected=data.get("expected"),
+        )

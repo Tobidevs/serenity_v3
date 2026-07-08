@@ -4,10 +4,12 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
 Route = Literal["continue_to_supervisor", "ask_for_clarification", "bypass_to_generation"]
-
+Denominational_Scope = Literal["neutral_baseline", "neutral_with_denominational_support", "comparative"]
+Tool = Literal["subagent", "bible_api", "greek_hebrew_tool", ]
 
 class PlanStep(BaseModel):
     step_number: str
+    tool: Tool
     step_name: str
     description: str
 
@@ -21,6 +23,7 @@ class PlannerOutput(BaseModel):
     refined_query: Optional[str] = None
     clarification_request: Optional[str] = Field(default="")
     plan: Optional[Plan] = Field(default_factory=Plan)
+    denominational_scope: Denominational_Scope
 
 
 class AgentState(TypedDict, total=False):
