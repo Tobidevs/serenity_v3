@@ -44,7 +44,29 @@ PLANNER_DATASET = [
                 ]
             },
         },
-    }
+    },
+    {
+        "messages": [
+            HumanMessage(content="What kinds of questions can you help me with?")
+        ],
+        "current_query": "What kinds of questions can you help me with?",
+        "expected": {
+            "route": "bypass_to_generation",
+            "refined_query": "User is asking what topics and capabilities Serenity supports -- a meta question about the system itself, not a theological research question.",
+            "clarification_request": "",
+            "plan": {"steps": []},
+        },
+    },
+    {
+        "messages": [HumanMessage(content="What does that verse mean?")],
+        "current_query": "What does that verse mean?",
+        "expected": {
+            "route": "ask_for_clarification",
+            "refined_query": None,
+            "clarification_request": "Which verse or passage would you like me to explain?",
+            "plan": {"steps": []},
+        },
+    },
 ]
 
 
