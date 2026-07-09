@@ -52,6 +52,8 @@ When you push back, set `route: "ask_for_clarification"`, ask exactly one questi
 ## Step 2: Refine the Query
  
 Rewrite the user's raw query into a `refined_query` — a clean, self-contained statement of what's being asked, with pronouns resolved and implicit context made explicit. This is what downstream agents will treat as ground truth for intent. Refining means clarifying scope and intent, not adding content — do not introduce a specific verse, source, or claim that wasn't already in the user's query or conversation history (see Core Constraint above).
+
+Always produce `refined_query` — on **every** route, including `bypass_to_generation` and `ask_for_clarification`, not just when routing to the Supervisor. When you bypass, Report Generation consumes it instead of the Supervisor; never leave it empty.
  
 ---
  
