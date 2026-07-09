@@ -164,18 +164,22 @@ Respond with ONLY the JSON object described below. No markdown fences, no
 preamble.
 """
 JUDGE_USER_PROMPT = """
+PLANNER SYSTEM PROMPT (the operating policy you grade against):
+{planner_system_prompt}
 
-CURRENT CONVERSATION HISTORY
-History: {{input.messages}}
+---
+CURRENT CONVERSATION HISTORY:
+{history}
 
 ---
 PLANNER OUTPUT TO GRADE:
-route: {{output.route}}
-refined_query: {{output.refined_query}}
-clarification_request: {{output.clarification_request}}
-plan: {{output.plan}}
+route: {route}
+refined_query: {refined_query}
+clarification_request: {clarification_request}
+denominational_scope: {denominational_scope}
+plan: {plan}
 
 ---
-REFERENCE (optional — may be absent):
-{{expected}}
+REFERENCE (optional -- may be absent):
+{expected}
 """

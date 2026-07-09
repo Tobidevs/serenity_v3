@@ -1,9 +1,19 @@
 import json
-from braintrust import Literal, Score
-from .planner_judge_prompts import PLAN_DECISION_FIDELITY_PROMPT, JUDGE_USER_PROMPT
+
+from braintrust import Score
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
+from typing import Literal
+from functools import lru_cache
+
+from dotenv import load_dotenv
+
+from agent.prompts import PLANNER_NODE_SYSTEM_PROMPT
+from .planner_judge_prompts import PLAN_DECISION_FIDELITY_PROMPT, JUDGE_USER_PROMPT
+
+load_dotenv()
+
 
 class PlannerJudgeOutput(BaseModel):
     reasoning: str = Field(description="Step-by-step analysis, written before any verdict")
@@ -19,22 +29,46 @@ class PlannerJudgeOutput(BaseModel):
     grounding_rationale: str = Field(description="Rationale for the grounding score")
     grounding_flagged_items: list[str] = Field(description="List of grounding issues or flagged items")
 
-model = init_chat_model(model_name="openai:gpt-5")
-planner_judge_model = model.with_structured_output(PlannerJudgeOutput)
+
+@lru_cache(maxsize=1)
+def _planner_judge_model():
+    """Lazily build the structured judge model.
+
+    Lazy + cached so importing this module doesn't require OPENAI_API_KEY at
+    import time (eval_init imports this before tasks.py loads the .env).
+    """
+    model = init_chat_model("openai:gpt-5")
+    return model.with_structured_output(PlannerJudgeOutput)
+
+
+def _format_history(messages):
+    if not messages:
+        return "(no prior conversation)"
+    lines = []
+    for m in messages:
+        role = getattr(m, "type", None) or (m.get("role") if isinstance(m, dict) else "user")
+        content = getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else str(m))
+        lines.append(f"{role}: {content}")
+    return "\n".join(lines)
 
 
 def planner_decision_fidelity(input, output, expected=None, metadata=None):
     user_prompt = JUDGE_USER_PROMPT.format(
-        input=input,  # expects input.messages
-        output=output,  # the PlannerOutput dict
+        planner_system_prompt=PLANNER_NODE_SYSTEM_PROMPT,
+        history=_format_history(input.get("messages")),
+        route=output.get("route"),
+        refined_query=output.get("refined_query"),
+        clarification_request=output.get("clarification_request"),
+        denominational_scope=output.get("denominational_scope"),
+        plan=json.dumps(output.get("plan"), indent=2),
         expected=(
-            json.dumps(expected)
+            json.dumps(expected, indent=2)
             if expected
-            else "None provided — grade reference-free."
+            else "None provided \u2014 grade reference-free."
         ),
     )
 
-    result = planner_judge_model.invoke(
+    result: PlannerJudgeOutput = _planner_judge_model().invoke(
         [
             SystemMessage(content=PLAN_DECISION_FIDELITY_PROMPT),
             HumanMessage(content=user_prompt),
@@ -44,29 +78,29 @@ def planner_decision_fidelity(input, output, expected=None, metadata=None):
     return [
         Score(
             name="route_correctness",
-            score=result["route_score"],
+            score=result.route_score,
             metadata={
-                "verdict": result["route_verdict"],
-                "rationale": result["route_rationale"],
-                "reasoning": result["reasoning"],
+                "verdict": result.route_verdict,
+                "rationale": result.route_rationale,
+                "reasoning": result.reasoning,
             },
         ),
         Score(
             name="execution_fidelity",
-            score=result["execution_score"],
+            score=result.execution_score,
             metadata={
-                "verdict": result["execution_verdict"],
-                "rationale": result["execution_rationale"],
-                "flags": result.get("flags", []),
+                "verdict": result.execution_verdict,
+                "rationale": result.execution_rationale,
+                "flags": result.flags,
             },
         ),
         Score(
             name="grounding_fidelity",
-            score=result["grounding_score"],
+            score=result.grounding_score,
             metadata={
-                "verdict": result["grounding_verdict"],
-                "rationale": result["grounding_rationale"],
-                "flagged_items": result.get("grounding_flagged_items", []),
+                "verdict": result.grounding_verdict,
+                "rationale": result.grounding_rationale,
+                "flagged_items": result.grounding_flagged_items,
             },
         ),
     ]

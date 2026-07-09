@@ -9,6 +9,11 @@ PLANNER_DATASET = [
             )
         ],
         "current_query": "What verse or passage do catholics use to support the immaculate conception?",
+        "metadata": {
+            "case_id": "catholic_immaculate_conception_scripture",
+            "category": "scriptural_research",
+            "expected_route": "continue_to_supervisor",
+        },
         "expected": {
             "route": "continue_to_supervisor",
             "refined_query": (
@@ -50,6 +55,11 @@ PLANNER_DATASET = [
             HumanMessage(content="What kinds of questions can you help me with?")
         ],
         "current_query": "What kinds of questions can you help me with?",
+        "metadata": {
+            "case_id": "meta_capabilities_question",
+            "category": "meta_system",
+            "expected_route": "bypass_to_generation",
+        },
         "expected": {
             "route": "bypass_to_generation",
             "refined_query": "User is asking what topics and capabilities Serenity supports -- a meta question about the system itself, not a theological research question.",
@@ -60,9 +70,14 @@ PLANNER_DATASET = [
     {
         "messages": [HumanMessage(content="What does that verse mean?")],
         "current_query": "What does that verse mean?",
+        "metadata": {
+            "case_id": "ambiguous_verse_reference",
+            "category": "ambiguous_reference",
+            "expected_route": "ask_for_clarification",
+        },
         "expected": {
             "route": "ask_for_clarification",
-            "refined_query": None,
+            "refined_query": "User's query is ambiguous because they did not specify which verse they are referring to. The system should ask for clarification.",
             "clarification_request": "Which verse or passage would you like me to explain?",
             "plan": {"steps": []},
         },
@@ -71,11 +86,14 @@ PLANNER_DATASET = [
 
 
 def build_planner_dataset():
-    for data in PLANNER_DATASET:
+    return [
         EvalCase(
             input={
                 "query": data["current_query"],
                 "messages": data.get("messages", []),
             },
             expected=data.get("expected"),
+            metadata=data.get("metadata"),
         )
+        for data in PLANNER_DATASET
+    ]
