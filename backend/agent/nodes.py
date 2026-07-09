@@ -36,6 +36,7 @@ def planner_node(state: AgentState) -> dict:
         "refined_query": result.refined_query or "",
         "clarification_request": result.clarification_request or "",
         "plan": result.plan,
+        "denominational_scope": result.denominational_scope,
     }
 
 

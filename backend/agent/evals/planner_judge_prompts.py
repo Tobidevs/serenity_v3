@@ -8,7 +8,8 @@ route are faithful to the policy defined in its own system prompt.
 You will be given:
 - The Planner's system prompt (its actual operating policy)
 - The user query and recent conversation context the Planner had access to
-- The Planner's output (route, refined_query, clarification_request, plan)
+- The Planner's output (route, refined_query, clarification_request,
+  denominational_scope, plan)
 - Optionally, a reference/expected output
 
 Grade in three independent dimensions. Think step by step in a "reasoning" field
@@ -66,10 +67,24 @@ If continue_to_supervisor:
 - plan correctness: right tools chosen (Bible API vs. search vs. subagents vs.
   Greek/Hebrew tool); each step's description is concrete enough that a
   subagent could execute it without re-interpreting intent.
-- denominational_scope: correctly set to neutral_baseline /
-  neutral_with_denominational_support / comparative, and the plan's structure
-  actually reflects that scope (e.g. comparative should show balanced, labeled
-  per-tradition steps — not one merged step).
+- denominational_scope: correctly set, AND the plan's structure reflects it.
+  Scope is whose frame the answer belongs to, not which traditions get
+  mentioned.
+    neutral_baseline — no tradition's frame; a general/definitional question.
+    neutral_with_denominational_support — the QUESTION is neutral;
+      denominational views serve a general answer rather than becoming it.
+    denominational_support — the user asked about ONE named denomination's
+      doctrine, practice, or scriptural basis ("What verse do Catholics use
+      to support the immaculate conception?"). The plan should research from
+      inside that tradition; giving other traditions equal structural weight,
+      or flattening into a neutral survey, is a mismatch.
+    comparative — the user explicitly asked to compare; the plan should show
+      balanced, labeled per-tradition steps, not one merged step.
+  The middle two share a word and are the common confusion. Test: strip every
+  denomination out of the question — still answerable means a neutral_* scope;
+  it dissolves means denominational_support (one named) or comparative
+  (several). Penalize both directions and flag wrong_denominational_scope.
+  Naming a denomination is scope-setting, not a grounding violation.
 
 If bypass_to_generation:
 - Confirm the zero-tool condition is genuinely met — no factual, theological,
@@ -82,6 +97,10 @@ If ask_for_clarification:
 - Exactly one question is asked (policy requires exactly one).
 - The question is well-targeted: answering it actually resolves the ambiguity,
   and it's phrased so the user can easily answer.
+
+On bypass_to_generation and ask_for_clarification there is no research to fence,
+so policy sets neutral_baseline. Any other value is a minor issue (flag
+wrong_denominational_scope), not a fundamental one.
 
 Score:
 - 1.0 "excellent" — fully matches the rubric for the chosen route.
@@ -97,10 +116,10 @@ DIMENSION 3 — GROUNDING FIDELITY
 ═══════════════════════════════════════════════════════════════
 The Planner has no search tool, no Bible API, and no Greek/Hebrew tool. A plan
 describes WHAT the Supervisor should go find — it must never assert WHAT that
-research will find. Check `refined_query` and every plan step description
-(and, secondarily, `clarification_request`) for content the Planner could only
-have supplied from its own training data rather than from the user's query or
-conversation history.
+research will find. Check `refined_query`, every plan step description, and
+`clarification_request` — all three equally — for content the Planner could
+only have supplied from its own training data rather than from the user's
+query or conversation history.
 
 A violation is any specific, checkable fact introduced by the Planner itself:
 - A specific verse or passage citation (e.g. "Romans 9:14-24") that the user's
@@ -108,6 +127,13 @@ A violation is any specific, checkable fact introduced by the Planner itself:
 - A specific date, council, or creed reference presented as fact.
 - A specific quote, or a specific claim attributed to a named theologian,
   denomination, or text ("Calvin's Institutes IV.17 argues...").
+- Any of the above offered as an EXAMPLE, including inside a clarification
+  question ("Which verse? e.g. John 3:16"). An example is still a citation
+  the Planner chose: a user who answers "yes, that one" converts the guess
+  into a user-supplied fact, laundering it into the research it was meant to
+  be excluded from. Score this 0.0, the same as a leak into a plan step —
+  it reaches research by way of the user's answer. Illustrating notation
+  ("give the book, chapter, and verse") is fine; naming a verse is not.
 This is true EVEN IF the fact is accurate — the point is that the Planner is
 not the source of truth for this system; the research dossier is. An injected
 citation anchors the Supervisor's subagents toward confirming a guess instead
@@ -117,7 +143,11 @@ information as if it were verified.
 NOT a violation — this is the Planner correctly setting research scope, not
 asserting content:
 - Naming a topic, doctrine, denomination, or tradition as a research category
-  ("compare Reformed and Wesleyan-Arminian views on predestination").
+  ("compare Reformed and Wesleyan-Arminian views on predestination") —
+  including inside a clarification question ("Catholic or Reformed?"). That
+  is scope, not a fact.
+- Asking for a citation without supplying one ("Which verse? Please give the
+  book, chapter, and verse.").
 - A generic research directive with no specific citation ("identify
   commonly-cited scriptural passages on this topic," "survey how major
   traditions differ on this doctrine").

@@ -21,6 +21,7 @@ PLANNER_DATASET = [
                 "in support of the doctrine of the Immaculate Conception?"
             ),
             "clarification_request": "",
+            "denominational_scope": "denominational_support",
             "plan": {
                 "steps": [
                     {
@@ -64,6 +65,7 @@ PLANNER_DATASET = [
             "route": "bypass_to_generation",
             "refined_query": "User is asking what topics and capabilities Serenity supports -- a meta question about the system itself, not a theological research question.",
             "clarification_request": "",
+            "denominational_scope": "neutral_baseline",
             "plan": {"steps": []},
         },
     },
@@ -79,6 +81,7 @@ PLANNER_DATASET = [
             "route": "ask_for_clarification",
             "refined_query": "User's query is ambiguous because they did not specify which verse they are referring to. The system should ask for clarification.",
             "clarification_request": "Which verse or passage would you like me to explain?",
+            "denominational_scope": "neutral_baseline",
             "plan": {"steps": []},
         },
     },
