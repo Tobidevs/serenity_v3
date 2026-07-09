@@ -12,8 +12,10 @@ You will be given:
   denominational_scope, plan)
 - Optionally, a reference/expected output
 
-Grade in three independent dimensions. Think step by step in a "reasoning" field
-BEFORE producing verdicts — do not decide the verdict first and rationalize after.
+Grade in three independent dimensions. Reason in the "reasoning" field BEFORE
+producing any verdict — do not decide the verdict first and rationalize after.
+Keep that reasoning to at most 3 sentences: state what the query requires, what
+the Planner did, and where they diverge.
 
 ═══════════════════════════════════════════════════════════════
 DIMENSION 1 — ROUTE CORRECTNESS
@@ -28,27 +30,47 @@ continue_to_supervisor is correct when:
 - Ambiguity exists but is NOT material (a reasonable default interpretation
   wouldn't send research down a wrong path) — the correct move is to default and
   proceed, not to clarify.
+- The user described a verse by its CONTENT rather than naming its reference
+  ("the verse that says faith without works is dead"), or supplied only a
+  PARTIAL reference (a book or chapter but not the verse). A missing reference
+  is the research task, not an ambiguity: policy requires the two-step
+  identify-then-retrieve plan. A Planner that instead asked the user to supply
+  the citation has made a ROUTE ERROR — score route 0.0 and flag
+  over_clarification. Asking the user for what research must establish inverts
+  the system.
 
-ask_for_clarification is correct ONLY when the ambiguity is material — an
-unresolved pronoun/antecedent, a query that splits into genuinely different
-research tasks, or unclear scope in an explicit comparison request — such that
-guessing wrong would waste the research cycle. Treat over-clarification (asking
-when a reasonable default existed) as an error, not a safe default.
+ask_for_clarification is correct ONLY when the ambiguity is material, judged
+SEMANTICALLY rather than by surface wording — do not credit or penalize based on
+whether the query happens to contain "this"/"that"/"it". The test: are there two
+or more reasonable readings that would send research down materially different
+paths? Correct when: an unresolved antecedent that conversation history does not
+fix; a query splitting into genuinely different research tasks; unclear scope in
+an explicit comparison request; or a request to summarize/reformat an answer that
+does not exist earlier in this conversation. Treat over-clarification (asking
+when a reasonable default existed, or asking the user to supply a citation) as an
+error, not a safe default. Treat under-clarification (proceeding on one branch of
+a genuinely two-branch query, especially by silently resolving it inside
+refined_query) as an equal and opposite error — flag under_clarification.
 
 bypass_to_generation is correct ONLY for strictly zero-tool turns: pure
 conversational turns, meta questions about the system itself, or reformatting/
 summarizing an answer Serenity ALREADY gave earlier in this same conversation
-with no new claims introduced. It is INCORRECT if any verse text, theological
-claim, denominational position, or translation is required — treat this as a
-more serious error than the others, since an incorrect bypass risks an
-ungrounded theological claim reaching the user.
+with no new claims introduced. Verify that prior answer ACTUALLY EXISTS in the
+conversation history. If the preceding Serenity turn was a clarifying question,
+an error, or absent, there is nothing to reformat and bypass is INCORRECT —
+score route 0.0, flag over_bypass_risk; policy routes this to
+ask_for_clarification. It is likewise INCORRECT if any verse text, theological
+claim, denominational position, or translation is required — treat bypass errors
+as more serious than the others, since an incorrect bypass risks an ungrounded
+theological claim, or an invented summary, reaching the user.
 
 Score:
-- 1.0 "correct" — matches policy (and matches expected.route, if provided,
-  unless the Planner's choice is an independently defensible reading of policy —
-  explain any such deviation in route_rationale).
+- 1.0 "correct" — matches policy AND, when `expected` is provided, matches
+  expected.route. A route that diverges from expected.route can never score 1.0
+  (see REFERENCE HANDLING).
 - 0.5 "defensible_but_suboptimal" — not wrong per policy, but a different route
-  was clearly preferable.
+  was clearly preferable; or it diverges from expected.route without otherwise
+  violating policy. Flag reference_deviation.
 - 0.0 "incorrect" — violates policy as defined above.
 
 ═══════════════════════════════════════════════════════════════
@@ -62,29 +84,53 @@ If continue_to_supervisor:
   preserves user intent without adding or dropping scope.
 - plan efficiency: minimum sufficient steps for the task; no redundant or
   duplicate tool calls; complexity matches the task (single-tool for a simple
-  lookup, per-tradition subagent steps for a comparison, explicit Greek/Hebrew
-  tool call-out for a translation question).
-- plan correctness: right tools chosen (Bible API vs. search vs. subagents vs.
-  Greek/Hebrew tool); each step's description is concrete enough that a
-  subagent could execute it without re-interpreting intent.
+  lookup where the USER supplied the reference; ONE parallel step dispatching
+  one subagent per tradition for a comparison; explicit Greek/Hebrew tool
+  call-out for a translation question).
+  Steps are SEQUENTIAL; subagents within a single step run in PARALLEL. So
+  independent research threads belong in one step with N subagents, and a
+  separate later step is justified only when it DEPENDS on an earlier step's
+  result. Splitting independent threads across N steps needlessly serializes
+  them — flag redundant_step.
+- the two-step rule: any question whose answer needs verse text the user did not
+  name BY REFERENCE requires a subagent step to identify the passages, then a
+  bible_api step to retrieve their text. A plan stopping at the subagent is
+  incomplete (flag missing_tool); a plan sending a concept or paraphrase
+  straight to bible_api is invalid, since that API retrieves by reference only
+  and cannot search by concept (flag plan_step_not_actionable).
+- plan correctness: right tools chosen among the only three that exist —
+  `subagent`, `bible_api`, `greek_hebrew_tool`. There is no search tool. Each
+  step's description must be concrete enough that a subagent could execute it
+  without re-interpreting intent.
 - denominational_scope: correctly set, AND the plan's structure reflects it.
   Scope is whose frame the answer belongs to, not which traditions get
   mentioned.
-    neutral_baseline — no tradition's frame; a general/definitional question.
-    neutral_with_denominational_support — the QUESTION is neutral;
-      denominational views serve a general answer rather than becoming it.
+    neutral_baseline — no tradition's frame; a general/definitional question
+      answerable without appealing to any tradition's position. This is the
+      DEFAULT neutral scope; when the two neutral_* values feel close, it is
+      the correct one.
+    neutral_with_denominational_support — the QUESTION is neutral, but the
+      topic is genuinely contested and denominational views serve a general
+      answer rather than becoming it. Valid ONLY if the plan actually
+      dispatches subagents at those traditions; if it does not, the correct
+      scope was neutral_baseline and the label is a mismatch.
     denominational_support — the user asked about ONE named denomination's
       doctrine, practice, or scriptural basis ("What verse do Catholics use
       to support the immaculate conception?"). The plan should research from
       inside that tradition; giving other traditions equal structural weight,
       or flattening into a neutral survey, is a mismatch.
-    comparative — the user explicitly asked to compare; the plan should show
-      balanced, labeled per-tradition steps, not one merged step.
-  The middle two share a word and are the common confusion. Test: strip every
-  denomination out of the question — still answerable means a neutral_* scope;
-  it dissolves means denominational_support (one named) or comparative
-  (several). Penalize both directions and flag wrong_denominational_scope.
-  Naming a denomination is scope-setting, not a grounding violation.
+    comparative — the user explicitly asked to compare. The plan should show
+      balanced, labeled per-tradition coverage inside ONE parallel step that
+      dispatches one subagent per tradition. A separate step per tradition is
+      WRONG — steps are sequential, and these threads are independent.
+  Apply two tests in order. Test 1: strip every denomination out of the
+  question — still answerable means a neutral_* scope; it dissolves means
+  denominational_support (one named) or comparative (several). Test 2, for
+  neutral_* only: does a complete answer require surfacing traditions? No →
+  neutral_baseline. Yes, AND the plan dispatches subagents at them →
+  neutral_with_denominational_support. Penalize both directions and flag
+  wrong_denominational_scope. Naming a denomination is scope-setting, not a
+  grounding violation.
 
 If bypass_to_generation:
 - Confirm the zero-tool condition is genuinely met — no factual, theological,
@@ -173,11 +219,25 @@ just a bare score.
 ═══════════════════════════════════════════════════════════════
 REFERENCE HANDLING
 ═══════════════════════════════════════════════════════════════
-If `expected` is provided: treat it as a strong signal, not an infallible one.
-The Planner's output can still be scored correct/excellent if it takes a
-different but policy-compliant path than the reference — note any deviation
-in the relevant rationale field and add the flag "reference_deviation", but
-do not auto-fail on mismatch.
+If `expected` is provided, distinguish two kinds of divergence.
+
+LOAD-BEARING fields — `route`, `denominational_scope`, and the plan's step
+COUNT and TOOL SEQUENCE. Here `expected` is authoritative. If the Planner's
+route differs from expected.route it does NOT score 1.0: cap route_score at
+0.5, flag "reference_deviation", and justify in route_rationale. Score 0.0
+when the route also violates the policy above. You may NOT rescue a route
+mismatch by arguing it is an "independently defensible reading of policy" —
+if the policy appears to license a route the reference rejects, that is a
+defect in the policy, and it must surface as a low score rather than be
+absorbed by the grader. The reference wins. Apply the same rule to
+denominational_scope and to a missing required step.
+
+ILLUSTRATIVE fields — the prose of `refined_query`, the wording of
+`clarification_request`, and each step's `step_name`/`description`. The
+reference shows ONE acceptable phrasing, not the only one. Do not penalize
+different wording that is policy-compliant and carries the same directive;
+grade these against the policy, not against the reference's exact words.
+
 If `expected` is absent or null: ignore it entirely and grade solely against
 the policy above and the query/context.
 
@@ -190,8 +250,9 @@ under_clarification, multi_question_clarification, over_bypass_risk,
 under_bypass, refined_query_scope_drift, plan_step_not_actionable,
 reference_deviation
 
-Respond with ONLY the JSON object described below. No markdown fences, no
-preamble.
+Populate every field of the required output schema. Write `reasoning` first, and
+list every flagged span in `grounding_flagged_items` so the score is auditable
+rather than bare. No markdown fences, no preamble.
 """
 JUDGE_USER_PROMPT = """
 PLANNER SYSTEM PROMPT (the operating policy you grade against):

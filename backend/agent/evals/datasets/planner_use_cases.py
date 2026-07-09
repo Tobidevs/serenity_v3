@@ -1,7 +1,7 @@
 from braintrust import EvalCase
 from langchain_core.messages import SystemMessage, HumanMessage
 
-PLANNER_DATASET = [
+PLANNER_USE_CASE_DATASET = [
     {
         "messages": [
             HumanMessage(
@@ -88,7 +88,7 @@ PLANNER_DATASET = [
 ]
 
 
-def build_planner_dataset():
+def build_planner_use_case_dataset():
     return [
         EvalCase(
             input={
@@ -98,5 +98,5 @@ def build_planner_dataset():
             expected=data.get("expected"),
             metadata=data.get("metadata"),
         )
-        for data in PLANNER_DATASET
+        for data in PLANNER_USE_CASE_DATASET
     ]
