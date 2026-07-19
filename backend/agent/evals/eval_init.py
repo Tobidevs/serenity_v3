@@ -6,8 +6,8 @@ from agent.evals.tasks import planner_eval_task
 
 Eval(
     "Serenity", 
-    data=build_planner_edge_case_dataset(),
+    data=build_planner_use_case_dataset(),
     task=planner_eval_task,
     scores=[planner_decision_fidelity],
-    experiment_name="planner_decision_fidelity",
+    experiment_name="planner_decision_fidelity: Regular UCs",
 )
