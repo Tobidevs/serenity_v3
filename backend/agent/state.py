@@ -1,3 +1,4 @@
+import operator
 from typing import Annotated, Literal, Optional, TypedDict
 
 from langgraph.graph.message import add_messages
@@ -40,3 +41,10 @@ class AgentState(TypedDict, total=False):
     clarification_request: str
     plan: Plan
     denominational_scope: Denominational_Scope
+
+
+class SubAgentState(TypedDict, total=False):
+    messages: Annotated[list, add_messages]
+    # Accumulates across every exa_search call in the loop rather than being
+    # overwritten by the most recent one.
+    sources: Annotated[list[dict], operator.add]
