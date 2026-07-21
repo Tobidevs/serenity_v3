@@ -48,3 +48,6 @@ class SubAgentState(TypedDict, total=False):
     # Accumulates across every exa_search call in the loop rather than being
     # overwritten by the most recent one.
     sources: Annotated[list[dict], operator.add]
+    # Counts llm turns; summed via operator.add so each llm_node return of 1
+    # increments it. Backstops the loop against a model that never finishes.
+    steps: Annotated[int, operator.add]

@@ -40,7 +40,24 @@ def _current_turn_tool_messages(messages: list) -> list[ToolMessage]:
     return [
         m for m in messages if isinstance(m, ToolMessage) and m.tool_call_id in ids
     ]
-    
+
+
+def _latest_ai_message(messages: list) -> AIMessage | None:
+    """The most recent AIMessage, whether or not it carried tool calls.
+
+    Routing keys off this: a turn with no tool calls is the model's implicit
+    "I'm done", so we must see the toolless turn itself rather than skipping
+    back to an earlier one that did call a tool.
+    """
+    return next(
+        (m for m in reversed(messages) if isinstance(m, AIMessage)),
+        None,
+    )
+
+
+MAX_STEPS = 8
+
+
 def _format_search_results(records: list[dict]) -> str:
     """Render search records as labeled, numbered text for the model to read.
 
@@ -137,15 +154,16 @@ def llm_node(state: SubAgentState) -> dict:
         replacements[message.id] = trimmed
 
     if not replacements:
-        return {"messages": [_subagent_model().invoke(messages)]}
+        return {"messages": [_subagent_model().invoke(messages)], "steps": 1}
 
     # Non-ToolMessages never match a key, so this swaps only the intercepted ones.
     model_messages = [replacements.get(m.id, m) for m in messages]
     response = _subagent_model().invoke(model_messages)
-    
+
     return {
         "messages": [*replacements.values(), response],
         "sources": sources,
+        "steps": 1,
     }
     
 
@@ -153,12 +171,23 @@ def process_search_results(state: SubAgentState) -> dict:
     pass
 
 
-def is_finished(state: SubAgentState) -> str:
-    """Route to reporting once the model has called submit_findings."""
-    for message in _current_turn_tool_messages(state["messages"]):
-        if message.name == "submit_findings":
-            return "process_search_results"
-    return "llm"
+def route_after_llm(state: SubAgentState) -> str:
+    """Decide where the loop goes after the model speaks.
+
+    Runs after llm (not after tool) so a turn with no tool calls terminates
+    instead of looping: ToolNode would no-op on it and the old post-tool check
+    would route back to llm forever. Order matters — implicit finish is checked
+    before submit_findings so a toolless turn can never fall through to a tool
+    dispatch, and the step backstop caps a model that keeps searching.
+    """
+    ai = _latest_ai_message(state["messages"])
+    if ai is None or not ai.tool_calls:
+        return "tool_results"
+    if any(call["name"] == "submit_findings" for call in ai.tool_calls):
+        return "process_search_results"
+    if state.get("steps", 0) >= MAX_STEPS:
+        return "tool_results"
+    return "tool"
 
 
 
@@ -169,13 +198,14 @@ subgraph.add_node("tool", ToolNode([exa_search, think, submit_findings]))
 subgraph.add_node("process_search_results", process_search_results)
 
 subgraph.add_edge(START, "llm")
-subgraph.add_edge("llm", "tool")
 subgraph.add_conditional_edges(
-    "tool",
-    is_finished,
+    "llm",
+    route_after_llm,
     {
-        "llm": "llm",
+        "tool": "tool",
         "process_search_results": "process_search_results",
+        "tool_results": "process_search_results",
     },
 )
+subgraph.add_edge("tool", "llm")
 subgraph.add_edge("process_search_results", END)
