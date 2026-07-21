@@ -51,3 +51,4 @@ class SubAgentState(TypedDict, total=False):
     # Counts llm turns; summed via operator.add so each llm_node return of 1
     # increments it. Backstops the loop against a model that never finishes.
     steps: Annotated[int, operator.add]
+    findings: Annotated[list[str], operator.add]

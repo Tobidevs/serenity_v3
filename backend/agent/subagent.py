@@ -22,6 +22,7 @@ def _subagent_model():
     )
     return model.bind_tools([exa_search, think, submit_findings])
 
+
 def _current_turn_tool_messages(messages: list) -> list[ToolMessage]:
     """ToolMessages answering the tool calls in the latest model turn.
 
@@ -37,9 +38,7 @@ def _current_turn_tool_messages(messages: list) -> list[ToolMessage]:
         return []
 
     ids = {tool_call["id"] for tool_call in ai.tool_calls}
-    return [
-        m for m in messages if isinstance(m, ToolMessage) and m.tool_call_id in ids
-    ]
+    return [m for m in messages if isinstance(m, ToolMessage) and m.tool_call_id in ids]
 
 
 def _latest_ai_message(messages: list) -> AIMessage | None:
@@ -129,8 +128,8 @@ def _intercept_search_results(
         status=message.status,
     )
     return sources, trimmed
-    
-    
+
+
 def llm_node(state: SubAgentState) -> dict:
     """Invoke the sub-agent model, intercepting exa_search results on the way in.
 
@@ -165,10 +164,26 @@ def llm_node(state: SubAgentState) -> dict:
         "sources": sources,
         "steps": 1,
     }
-    
+
 
 def process_search_results(state: SubAgentState) -> dict:
-    pass
+    """Lift the findings text out of the submit_findings call into state.
+
+    Both finish paths land here, so the call is often absent: an implicit
+    finish or the MAX_STEPS backstop arrives with no submit_findings at all.
+    That is a normal exit, not an error, so it writes nothing.
+    """
+    last_ai = _latest_ai_message(state["messages"])
+    if last_ai is None or not last_ai.tool_calls:
+        return {}
+
+    for call in last_ai.tool_calls:
+        if call["name"] != "submit_findings":
+            continue
+        findings = call.get("args", {}).get("findings")
+        if findings:
+            return {"findings": [findings]}
+    return {}
 
 
 def route_after_llm(state: SubAgentState) -> str:
@@ -188,7 +203,6 @@ def route_after_llm(state: SubAgentState) -> str:
     if state.get("steps", 0) >= MAX_STEPS:
         return "tool_results"
     return "tool"
-
 
 
 subgraph = StateGraph(SubAgentState)

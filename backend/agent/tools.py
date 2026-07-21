@@ -59,9 +59,9 @@ def think(thought: str, next_action: Literal["search_again", "stop_and_report"])
 
 
 @tool
-def submit_findings():
+def submit_findings(findings: str):
     """Signal that research is complete and findings are ready to report."""
-    pass
+    return "Findings Submitted"
 
 
 # results =  exa_search(main_query="What is the doctrine of the Trinity?", guiding_query="Explain the doctrine of the Trinity in Christian theology.", domain_scope=["primary_source"])
