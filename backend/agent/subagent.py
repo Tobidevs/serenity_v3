@@ -41,6 +41,32 @@ def _current_turn_tool_messages(messages: list) -> list[ToolMessage]:
         m for m in messages if isinstance(m, ToolMessage) and m.tool_call_id in ids
     ]
     
+def _format_search_results(records: list[dict]) -> str:
+    """Render search records as labeled, numbered text for the model to read.
+
+    Plain JSON forces the model to parse escaped strings and match brackets to
+    tell one result from another. Labeled fields under a bracketed index make
+    the title/url/highlight boundaries unambiguous and let the model cite a
+    source by its number. `highlights` is a list, so each entry becomes its own
+    bullet; missing fields degrade to a placeholder rather than "None".
+    """
+    blocks = []
+    for i, record in enumerate(records, start=1):
+        title = record.get("title") or "(no title)"
+        url = record.get("url") or "(no url)"
+        highlights = record.get("highlights") or []
+
+        lines = [f"[{i}] TITLE: {title}", f"    URL: {url}"]
+        if highlights:
+            lines.append("    HIGHLIGHTS:")
+            lines.extend(f"      - {h}" for h in highlights)
+        else:
+            lines.append("    HIGHLIGHTS: (none)")
+        blocks.append("\n".join(lines))
+
+    return "\n\n".join(blocks)
+
+
 def _intercept_search_results(
     message: ToolMessage,
 ) -> tuple[list[dict], ToolMessage] | None:
@@ -79,7 +105,7 @@ def _intercept_search_results(
     ]
 
     trimmed = ToolMessage(
-        content=json.dumps(model_view),
+        content=_format_search_results(model_view),
         tool_call_id=message.tool_call_id,
         name=message.name,
         id=message.id,
@@ -95,8 +121,9 @@ def llm_node(state: SubAgentState) -> dict:
     `search_info`, and the favicon dropped from what the model sees.
     """
     messages = state["messages"]
-    replacements = dict[str, ToolMessage] = {}
-    
+    replacements: dict[str, ToolMessage] = {}
+    sources: list[dict] = []
+
     for message in _current_turn_tool_messages(messages):
         # Without an id there is no way to overwrite in place, and returning the
         # trimmed copy would append a duplicate instead.
@@ -105,10 +132,10 @@ def llm_node(state: SubAgentState) -> dict:
         intercepted = _intercept_search_results(message)
         if intercepted is None:
             continue
-        sources, trimmed = intercepted
-        sources.extend(sources)
+        record_sources, trimmed = intercepted
+        sources.extend(record_sources)
         replacements[message.id] = trimmed
-        
+
     if not replacements:
         return {"messages": [_subagent_model().invoke(messages)]}
 
