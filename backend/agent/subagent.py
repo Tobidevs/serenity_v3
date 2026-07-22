@@ -10,6 +10,16 @@ from .state import SubAgentState
 from .tools import exa_search, submit_findings
 
 
+def build_user_message(topic: str) -> str:
+    """Frame the Supervisor's research topic as the sub-agent's assignment.
+
+    The sub-agent is seeded with SUBAGENT_SYSTEM_PROMPT followed by this string
+    as its user turn; the prompt treats the topic as "your assignment," so a
+    light label is all the framing it needs.
+    """
+    return f"Research topic: {topic}"
+
+
 @lru_cache(maxsize=1)
 def _subagent_model():
     """Lazily build the structured planner model.
