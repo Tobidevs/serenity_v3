@@ -52,3 +52,6 @@ class SubAgentState(TypedDict, total=False):
     # increments it. Backstops the loop against a model that never finishes.
     steps: Annotated[int, operator.add]
     findings: Annotated[list[str], operator.add]
+    # `sources` appends, so it can't be deduped in place. The cleaned,
+    # citation-ready list is written here instead, leaving the raw one intact.
+    final_sources: list[dict]

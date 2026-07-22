@@ -13,7 +13,7 @@ load_dotenv()
 exa = Exa(api_key=os.getenv("EXA_API_KEY"))
 
 
-@tool(response_format="content_and_artifact")
+@tool
 def exa_search(main_query: str, guiding_query: str, domain_scope: list[str]):
     """Search allowlisted theological sources for passages relevant to a query.
 
@@ -31,7 +31,7 @@ def exa_search(main_query: str, guiding_query: str, domain_scope: list[str]):
 
     result = exa.search(
         query=main_query,
-        num_results=10,
+        num_results=5,
         type="auto",
         include_domains=domains,
         contents={

@@ -7,7 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from .state import SubAgentState
-from .tools import exa_search, submit_findings, think
+from .tools import exa_search, submit_findings
 
 
 @lru_cache(maxsize=1)
@@ -20,7 +20,7 @@ def _subagent_model():
     model = init_chat_model(
         "claude-haiku-4-5-20251001", model_provider="anthropic", temperature=0
     )
-    return model.bind_tools([exa_search, think, submit_findings])
+    return model.bind_tools([exa_search, submit_findings])
 
 
 def _current_turn_tool_messages(messages: list) -> list[ToolMessage]:
@@ -167,23 +167,42 @@ def llm_node(state: SubAgentState) -> dict:
 
 
 def process_search_results(state: SubAgentState) -> dict:
-    """Lift the findings text out of the submit_findings call into state.
+    """Publish the loop's output: the findings text and a citable source list.
 
-    Both finish paths land here, so the call is often absent: an implicit
-    finish or the MAX_STEPS backstop arrives with no submit_findings at all.
-    That is a normal exit, not an error, so it writes nothing.
+    `sources` collects one entry per search hit and its reducer appends, so the
+    same url recurs whenever two searches surface it and the list cannot be
+    cleaned in place. The deduped view is written to `final_sources`, leaving
+    the raw list intact as a record of what every search returned.
+
+    Both finish paths land here, so submit_findings is often absent — an
+    implicit finish or the MAX_STEPS backstop arrives without it. That is a
+    normal exit rather than an error: the findings text is simply omitted while
+    the sources gathered on the way still get published.
     """
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for source in state.get("sources", []):
+        url = source.get("url")
+        # A source with no url can be neither deduped nor cited.
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        unique.append(source)
+
+    result: dict = {"final_sources": unique}
+
     last_ai = _latest_ai_message(state["messages"])
     if last_ai is None or not last_ai.tool_calls:
-        return {}
+        return result
 
     for call in last_ai.tool_calls:
         if call["name"] != "submit_findings":
             continue
         findings = call.get("args", {}).get("findings")
         if findings:
-            return {"findings": [findings]}
-    return {}
+            result["findings"] = [findings]
+            break
+    return result
 
 
 def route_after_llm(state: SubAgentState) -> str:
@@ -208,7 +227,7 @@ def route_after_llm(state: SubAgentState) -> str:
 subgraph = StateGraph(SubAgentState)
 
 subgraph.add_node("llm", llm_node)
-subgraph.add_node("tool", ToolNode([exa_search, think, submit_findings]))
+subgraph.add_node("tool", ToolNode([exa_search, submit_findings]))
 subgraph.add_node("process_search_results", process_search_results)
 
 subgraph.add_edge(START, "llm")
