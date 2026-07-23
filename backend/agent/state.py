@@ -54,4 +54,4 @@ class SubAgentState(TypedDict, total=False):
     findings: Annotated[list[str], operator.add]
     # `sources` appends, so it can't be deduped in place. The cleaned,
     # citation-ready list is written here instead, leaving the raw one intact.
-    final_sources: list[dict]
+    final_sources: Annotated[list[dict], operator.add]

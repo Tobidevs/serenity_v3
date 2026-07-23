@@ -22,6 +22,14 @@ def _subagent_model():
     )
     return model.bind_tools([exa_search, submit_findings])
 
+def build_user_message(topic: str) -> str:
+    """Frame the Supervisor's research topic as the sub-agent's assignment.
+
+    The sub-agent is seeded with SUBAGENT_SYSTEM_PROMPT followed by this string
+    as its user turn; the prompt treats the topic as "your assignment," so a
+    light label is all the framing it needs.
+    """
+    return f"Research topic: {topic}"
 
 def _current_turn_tool_messages(messages: list) -> list[ToolMessage]:
     """ToolMessages answering the tool calls in the latest model turn.
@@ -242,3 +250,5 @@ subgraph.add_conditional_edges(
 )
 subgraph.add_edge("tool", "llm")
 subgraph.add_edge("process_search_results", END)
+
+search_subagent = subgraph.compile()

@@ -42,7 +42,11 @@ def _serialize_messages(messages: list) -> list[Message]:
         # LangGraph stores LangChain message objects; map their type to a role.
         content = getattr(m, "content", "")
         role = "assistant" if getattr(m, "type", None) == "ai" else "user"
-        out.append(Message(role=role, content=content if isinstance(content, str) else str(content)))
+        out.append(
+            Message(
+                role=role, content=content if isinstance(content, str) else str(content)
+            )
+        )
     return out
 
 
