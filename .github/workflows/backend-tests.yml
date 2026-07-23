@@ -1,0 +1,43 @@
+name: backend tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new commit cancels the superseded run for the same ref instead of queueing
+# behind it.
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Set up Python
+        # Reads backend/.python-version (3.12), matching requires-python.
+        run: uv python install
+
+      - name: Install dependencies
+        # --frozen installs exactly what uv.lock pins and fails if the lock file
+        # is out of date with pyproject.toml, rather than silently resolving.
+        run: uv sync --frozen
+
+      - name: Run unit tests
+        # Scoped to tests/ on purpose: agent/test_subagent.py is a manual
+        # integration script that hits live APIs, not a unit test.
+        run: uv run pytest tests/ -v
