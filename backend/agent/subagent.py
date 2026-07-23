@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
+from .resilience import LLMCallFailed, safe_invoke, with_llm_retry
 from .state import SubAgentState
 from .tools import exa_search, submit_findings
 
@@ -20,7 +21,7 @@ def _subagent_model():
     model = init_chat_model(
         "claude-haiku-4-5-20251001", model_provider="anthropic", temperature=0
     )
-    return model.bind_tools([exa_search, submit_findings])
+    return with_llm_retry(model.bind_tools([exa_search, submit_findings]))
 
 def build_user_message(topic: str) -> str:
     """Frame the Supervisor's research topic as the sub-agent's assignment.
@@ -143,6 +144,9 @@ def llm_node(state: SubAgentState) -> dict:
 
     Every search in the current turn has its title/url/favicon lifted into
     `search_info`, and the favicon dropped from what the model sees.
+
+    A call that fails for good writes `llm_error` instead of a model turn, which
+    `route_after_llm` reads as "stop here and publish what we have".
     """
     messages = state["messages"]
     replacements: dict[str, ToolMessage] = {}
@@ -160,12 +164,25 @@ def llm_node(state: SubAgentState) -> dict:
         sources.extend(record_sources)
         replacements[message.id] = trimmed
 
-    if not replacements:
-        return {"messages": [_subagent_model().invoke(messages)], "steps": 1}
+    model_messages = messages
+    if replacements:
+        # Non-ToolMessages never match a key, so this swaps only the intercepted ones.
+        model_messages = [replacements.get(m.id, m) for m in messages]
 
-    # Non-ToolMessages never match a key, so this swaps only the intercepted ones.
-    model_messages = [replacements.get(m.id, m) for m in messages]
-    response = _subagent_model().invoke(model_messages)
+    try:
+        response = safe_invoke(_subagent_model, model_messages, label="sub-agent")
+    except LLMCallFailed as exc:
+        # The interception above already happened, so its sources and trimmed
+        # messages are published even though the call that would have consumed
+        # them failed. `steps` is left alone: no model turn was spent.
+        return {
+            "messages": [*replacements.values()],
+            "sources": sources,
+            "llm_error": str(exc),
+        }
+
+    if not replacements:
+        return {"messages": [response], "steps": 1}
 
     return {
         "messages": [*replacements.values(), response],
@@ -182,10 +199,11 @@ def process_search_results(state: SubAgentState) -> dict:
     cleaned in place. The deduped view is written to `final_sources`, leaving
     the raw list intact as a record of what every search returned.
 
-    Both finish paths land here, so submit_findings is often absent — an
-    implicit finish or the MAX_STEPS backstop arrives without it. That is a
-    normal exit rather than an error: the findings text is simply omitted while
-    the sources gathered on the way still get published.
+    Every finish path lands here, so submit_findings is often absent — an
+    implicit finish, the MAX_STEPS backstop, or an `llm_error` exit all arrive
+    without it. The findings text is simply omitted in those cases while the
+    sources gathered on the way still get published; `llm_error` is what
+    distinguishes a failed run from one that genuinely found nothing.
     """
     seen: set[str] = set()
     unique: list[dict] = []
@@ -222,6 +240,13 @@ def route_after_llm(state: SubAgentState) -> str:
     before submit_findings so a toolless turn can never fall through to a tool
     dispatch, and the step backstop caps a model that keeps searching.
     """
+    # Checked first, and explicitly: a failed call appends no message, so the
+    # latest AIMessage is still the previous turn's — tool calls included, and
+    # already answered. Falling through would re-dispatch those same calls and
+    # spin the loop until MAX_STEPS.
+    if state.get("llm_error"):
+        return "tool_results"
+
     ai = _latest_ai_message(state["messages"])
     if ai is None or not ai.tool_calls:
         return "tool_results"

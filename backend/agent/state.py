@@ -52,6 +52,10 @@ class SubAgentState(TypedDict, total=False):
     # increments it. Backstops the loop against a model that never finishes.
     steps: Annotated[int, operator.add]
     findings: Annotated[list[str], operator.add]
+    # Set when the sub-agent's LLM call gives up. Ends the loop via
+    # `route_after_llm` and tells the caller the findings are short because the
+    # model became unreachable, not because the research came up empty.
+    llm_error: str
     # `sources` appends, so it can't be deduped in place. The cleaned,
     # citation-ready list is written here instead, leaving the raw one intact.
     final_sources: Annotated[list[dict], operator.add]

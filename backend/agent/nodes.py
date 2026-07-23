@@ -5,10 +5,21 @@ from langchain_core.messages import SystemMessage
 from langgraph.types import interrupt
 
 from agent.prompts import PLANNER_NODE_SYSTEM_PROMPT
-from agent.state import AgentState, PlannerOutput, Route
+from agent.resilience import LLMCallFailed, safe_invoke, with_llm_retry
+from agent.state import AgentState, Plan, PlannerOutput, Route
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# Shown to the user when the planner can't be reached at all. The graph routes
+# to the clarification node to deliver it, which pauses on interrupt() and
+# re-plans with whatever the user says next — so a transient outage costs the
+# user a rephrase rather than the whole thread.
+PLANNER_FAILURE_MESSAGE = (
+    "Sorry — I had trouble processing that just now. "
+    "Could you send your question again?"
+)
+
 
 @lru_cache(maxsize=1)
 def _planner_model():
@@ -18,7 +29,7 @@ def _planner_model():
     module doesn't require ANTHROPIC_API_KEY (e.g. during tests/graph build).
     """
     model = init_chat_model("claude-haiku-4-5-20251001", model_provider="anthropic", temperature=0)
-    return model.with_structured_output(PlannerOutput)
+    return with_llm_retry(model.with_structured_output(PlannerOutput))
 
 
 def planner_node(state: AgentState) -> dict:
@@ -26,10 +37,27 @@ def planner_node(state: AgentState) -> dict:
 
     The planner is fed the entire message history and returns a structured
     PlannerOutput. Routing itself is handled by `route_from_planner`.
+
+    The planner is the graph's entry node, so an unhandled failure here loses
+    the run. Instead we degrade to a clarification: the user gets a plain
+    apology and a chance to retry, and the thread stays alive.
     """
-    result: PlannerOutput = _planner_model().invoke(
-        [SystemMessage(content=PLANNER_NODE_SYSTEM_PROMPT), *state["messages"]]
-    )
+    try:
+        result: PlannerOutput = safe_invoke(
+            _planner_model,
+            [SystemMessage(content=PLANNER_NODE_SYSTEM_PROMPT), *state["messages"]],
+            label="planner",
+        )
+    except LLMCallFailed:
+        # Clear the planning fields rather than leaving a previous turn's values
+        # in place: this run produced no plan, and a stale one read as current
+        # would send the supervisor off researching the wrong question.
+        return {
+            "route": "ask_for_clarification",
+            "refined_query": "",
+            "clarification_request": PLANNER_FAILURE_MESSAGE,
+            "plan": Plan(),
+        }
 
     return {
         "route": result.route,
