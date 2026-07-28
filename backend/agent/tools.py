@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from exa_py import Exa
 from langchain_core.tools import tool
 
+from agent.bible_api import fetch_passage
 from lib.domains import DOMAIN_ALLOWLIST
 
 load_dotenv()
@@ -62,6 +63,33 @@ def think(thought: str, next_action: Literal["search_again", "stop_and_report"])
 def submit_findings(findings: str):
     """Signal that research is complete and findings are ready to report."""
     return "Findings Submitted"
+
+
+@tool
+def bible_passage(
+    book: str,
+    chapter: int,
+    verse: int | None = None,
+    start_verse: int | None = None,
+    end_verse: int | None = None,
+    translation: str | None = None,
+) -> str:
+    """Look up the text of a Bible passage by reference.
+
+    Use `verse` on its own for a single verse, or `start_verse` and `end_verse`
+    together for a multi-verse passage. Supplying neither returns the whole
+    chapter.
+
+    Args:
+        book: Book name, e.g. "Genesis", "1 Corinthians", "Song of Songs".
+        chapter: Chapter number.
+        verse: Single verse to retrieve. Omit when requesting a range.
+        start_verse: First verse of a multi-verse passage. Requires end_verse.
+        end_verse: Last verse of a multi-verse passage. Requires start_verse.
+        translation: Translation abbreviation such as "ESV", "NIV", or "KJV".
+            Defaults to the configured translation when omitted.
+    """
+    return fetch_passage(book, chapter, verse, start_verse, end_verse, translation)
 
 
 # results =  exa_search(main_query="What is the doctrine of the Trinity?", guiding_query="Explain the doctrine of the Trinity in Christian theology.", domain_scope=["primary_source"])
