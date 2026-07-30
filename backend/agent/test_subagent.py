@@ -24,6 +24,6 @@ def test_search_subagent(query: str):
 
 
 if __name__ == "__main__":
-    query = "What is the significance of the number 7 in the Bible?"
+    query = "What arguments are there against personal interpretation of scripture?"
     result = test_search_subagent(query)
     print("Final Findings:\n", result["findings"])
