@@ -7,7 +7,7 @@ table is pinned here by construction, without invoking a model.
 
 from langchain_core.messages import HumanMessage
 
-from agent.subagent import MAX_STEPS, route_after_llm
+from agent.subagent import MAX_SEARCHES, MAX_STEPS, route_after_llm
 from helpers import ai, call
 
 
@@ -52,3 +52,22 @@ def test_missing_steps_treated_as_zero():
     # No `steps` key yet -> 0, well below the backstop -> keep searching.
     state = {"messages": [ai([call("s")])]}
     assert route_after_llm(state) == "tool"
+
+
+def test_search_at_ceiling_still_dispatches():
+    # Boundary: the call that reaches MAX_SEARCHES is allowed to run.
+    state = {"messages": [ai([call(str(i)) for i in range(MAX_SEARCHES)])]}
+    assert route_after_llm(state) == "tool"
+
+
+def test_search_past_ceiling_hits_backstop():
+    # One over the ceiling is blocked, so the loop publishes what it gathered
+    # rather than dispatching a search the budget does not cover.
+    state = {"messages": [ai([call(str(i)) for i in range(MAX_SEARCHES + 1)])]}
+    assert route_after_llm(state) == "tool_results"
+
+
+def test_ceiling_counts_across_turns():
+    # The count is over the whole history, not just the turn being routed.
+    state = {"messages": [ai([call(str(i))]) for i in range(MAX_SEARCHES + 1)]}
+    assert route_after_llm(state) == "tool_results"

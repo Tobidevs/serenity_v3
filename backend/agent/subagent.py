@@ -63,7 +63,26 @@ def _latest_ai_message(messages: list) -> AIMessage | None:
     )
 
 
+def _search_count(messages: list) -> int:
+    """exa_search calls issued so far, including the turn being routed.
+
+    Counted from the message history rather than tracked in state so the ceiling
+    cannot drift out of sync with what was actually dispatched.
+    """
+    return sum(
+        1
+        for m in messages
+        if isinstance(m, AIMessage)
+        for call in m.tool_calls
+        if call["name"] == "exa_search"
+    )
+
+
 MAX_STEPS = 8
+# The ceiling SUBAGENT_SYSTEM_PROMPT already tells the sub-agent to respect.
+# MAX_STEPS counts llm turns, so it can't enforce this one: a single turn may
+# carry several searches.
+MAX_SEARCHES = 5
 
 
 def _format_search_results(records: list[dict]) -> str:
@@ -238,7 +257,8 @@ def route_after_llm(state: SubAgentState) -> str:
     instead of looping: ToolNode would no-op on it and the old post-tool check
     would route back to llm forever. Order matters — implicit finish is checked
     before submit_findings so a toolless turn can never fall through to a tool
-    dispatch, and the step backstop caps a model that keeps searching.
+    dispatch, and the search ceiling and step backstop cap a model that keeps
+    searching.
     """
     # Checked first, and explicitly: a failed call appends no message, so the
     # latest AIMessage is still the previous turn's — tool calls included, and
@@ -252,6 +272,11 @@ def route_after_llm(state: SubAgentState) -> str:
         return "tool_results"
     if any(call["name"] == "submit_findings" for call in ai.tool_calls):
         return "process_search_results"
+    # Counts the pending turn too, so this blocks the request that would exceed
+    # the ceiling rather than the one that reaches it: 5 searches run, a 6th ends
+    # the loop and publishes what was gathered.
+    if _search_count(state["messages"]) > MAX_SEARCHES:
+        return "tool_results"
     if state.get("steps", 0) >= MAX_STEPS:
         return "tool_results"
     return "tool"
