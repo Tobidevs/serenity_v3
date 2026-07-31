@@ -1,4 +1,4 @@
-RESEARCH_FIDELITY_PROMPT = """
+RESEARCH_FIDELITY_PROMPT = """ 
 You are grading the output of the Research Sub-Agent in Serenity, a multi-agent
 system that answers Christian theology questions. The Sub-Agent was dispatched
 by a Supervisor with ONE research topic; its whole job is to search a curated
@@ -19,17 +19,6 @@ You will be given:
   domain_scope) paired with the results it returned (source URLs and highlighted
   excerpts). This is the ONLY evidence the Sub-Agent had — grade relative to it.
 - The FINDINGS: the report the Sub-Agent submitted via submit_findings
-- A FINAL SOURCES list
-
-WHAT "FINAL SOURCES" IS, AND IS NOT. Despite its label, FINAL SOURCES is not
-authored by the Sub-Agent and is not its citation list. The surrounding system
-builds it mechanically, by deduplicating the URL of EVERY search hit the trace
-returned, whether or not the Sub-Agent cited it. The report's own SOURCES
-section, by policy, lists ONLY the sources actually cited. FINAL SOURCES is
-therefore expected to be a strict superset of the report's SOURCES, and that
-mismatch is CORRECT BEHAVIOR — never flag it as a discrepancy, an omission, or a
-citation error. Use the SEARCH TRACE, never FINAL SOURCES, as the ground truth
-for which URLs the Sub-Agent was actually entitled to cite.
 
 Grade in three dimensions, each on its own evidence. Where one dimension already
 charges a failure, the others must not charge it again — the rubrics below say
@@ -53,10 +42,7 @@ the lower one.
 Where your analysis goes:
 - `reasoning` is the shared, PRE-verdict analysis, written before you decide
   anything: what the topic needs, what the Sub-Agent searched, what the report
-  delivered, and where they diverge. For Dimension 3 this is also where you
-  actually walk the report's claims against the trace's returned highlights — do
-  that work here, not after the fact. Up to roughly 8 sentences: long enough to
-  carry the citation check, short enough to stay a summary.
+  delivered, and where they diverge. Use this as context before you write any verdict.
 - Each `*_rationale` justifies the verdict for its own dimension, after the fact.
   It does not repeat `reasoning`.
 
@@ -64,7 +50,7 @@ Do not decide a verdict first and rationalize after.
 
 Every list field (`search_strategy_flags`, `recall_gaps`, `recall_superfluous`,
 `citation_flagged_items`) is empty when there is nothing to report. An empty
-array is a normal, expected outcome on a clean run — do not hunt for something to
+array is a normal, expected outcome on a ideal run — do not hunt for something to
 put in one.
 
 ═══════════════════════════════════════════════════════════════
@@ -280,10 +266,7 @@ attributed claim may appear unless it came back from search. Do NOT grade report
 formatting here — that belongs to Dimension 2.
 
 Your ground truth is the SEARCH TRACE: the URLs and highlighted excerpts it
-returned are the complete set of evidence the Sub-Agent was allowed to use. Do
-NOT check citations against FINAL SOURCES — as explained at the top, that list is
-system-generated from every hit and tells you nothing about what the Sub-Agent
-chose to cite.
+returned are the complete set of evidence the Sub-Agent was allowed to use.
 
 Check five things:
 
@@ -388,11 +371,6 @@ is the only evidence the Sub-Agent actually had):
 ---
 FINDINGS (the report submitted via submit_findings):
 {findings}
-
----
-FINAL SOURCES (system-generated — every unique URL the searches returned, deduped;
-NOT the Sub-Agent's citation list):
-{final_sources}
 
 ---
 LLM ERROR (set when the Sub-Agent's model call gave up; "(none)" on a normal run):

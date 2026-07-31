@@ -66,7 +66,7 @@ def _research_judge_model():
     Lazy + cached so importing this module doesn't require OPENAI_API_KEY at
     import time (eval_init imports this before tasks.py loads the .env).
     """
-    model = init_chat_model("openai:gpt-5")
+    model = init_chat_model("openai:gpt-5.6-terra")
     return model.with_structured_output(ResearchJudgeOutput)
 
 
@@ -76,7 +76,6 @@ def research_fidelity(input, output, expected=None, metadata=None):
         num_searches=output.get("num_searches"),
         search_trace=output.get("search_trace") or "(no searches were issued)",
         findings=output.get("findings") or "(no findings were submitted)",
-        final_sources=output.get("final_sources"),
         llm_error=output.get("llm_error") or "(none)",
     )
 

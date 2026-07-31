@@ -19,7 +19,7 @@ def _subagent_model():
     module doesn't require ANTHROPIC_API_KEY (e.g. during tests/graph build).
     """
     model = init_chat_model(
-        "claude-haiku-4-5-20251001", model_provider="anthropic", temperature=0
+        "gpt-5.4-nano-2026-03-17", model_provider="openai", temperature=0
     )
     return with_llm_retry(model.bind_tools([exa_search, submit_findings]))
 
