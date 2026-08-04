@@ -168,7 +168,6 @@ summary, no commentary on its own process. The skeleton:
   TOPIC: <one line, the topic as the Sub-Agent interpreted it>
   KEY FINDINGS — self-contained claims, each carrying citation number(s)
   <THEMATIC HEADING> — optional further groupings, same citation rule
-  CONTESTED / DIVERGENT — position A [n] vs. position B [m], both attributed
   SOURCES — [n] <url copied verbatim> — one clause on what it contributed
   GAPS — what the topic needed that search did not return
 
@@ -197,14 +196,8 @@ supports but the report omits is a dropped finding (list it in `recall_gaps`).
 Reasoning beats bare conclusions (the Supervisor needs *why*), and a source
 writing from inside or against a tradition should be marked so.
 
-WHAT "CONTESTED" MEANS HERE. A topic counts as contested only when the RETURNED
-HIGHLIGHTS THEMSELVES carry both positions. Where they do, both must be surfaced
-and attributed; reporting one side while the trace held both is an omission, even
-if each stated line is itself sourced. Where the trace held only ONE side, the
-report is CORRECT to reflect only one side — that one-sidedness is a scope
-failure already charged under Dimension 1 (missing_tradition_scope), and charging
-it again here would penalize the same mistake twice. Grade the report against the
-evidence it had, never against the evidence it should have gone and got.
+Grade the report against the evidence it had, never against the evidence it
+should have gone and got.
 
 precision / economy — off-topic or adjacent material must be excluded or confined
 to one ADJACENT / OUT OF SCOPE line. Padding, findings duplicated across sections,
@@ -237,16 +230,15 @@ thorough, or pads thin evidence with filler. (Thinness filled with fabricated
 content is Dimension 3's concern, not this one.)
 
 Score:
-- 1.0 "complete" — captures every material finding the trace supports, attributes
-  the positions the trace contested, stays on topic, is honest about gaps, and
-  follows the required shape.
+- 1.0 "complete" — captures every material finding the trace supports, stays on
+  topic, is honest about gaps, and follows the required shape.
 - 0.66 "adequate" — captures the core but drops a secondary finding, carries
   minor off-topic/padding material, or has a contained format lapse (a missing
   GAPS section, a placeholder left under an empty heading, a short preamble).
-- 0.33 "partial" — misses a materially important finding the trace supported,
-  reports a trace-contested topic one-sidedly, is noticeably padded, or departs
-  from the required shape badly enough that the Supervisor cannot reliably tell
-  which lines are findings and which numbers support them.
+- 0.33 "partial" — misses a materially important finding the trace supported, is
+  noticeably padded, or departs from the required shape badly enough that the
+  Supervisor cannot reliably tell which lines are findings and which numbers
+  support them.
 - 0.0 "inadequate" — misses most of what the trace supported, or is so padded /
   off-topic / unstructured that the Supervisor gains little. (An empty report
   because the Sub-Agent never submitted findings — see DEGRADED RUNS — lands

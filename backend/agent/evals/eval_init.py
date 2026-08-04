@@ -22,5 +22,5 @@ Eval(
     data=build_research_topic_dataset(),
     task=research_eval_task,
     scores=[research_fidelity],
-    experiment_name="research_fidelity",
+    experiment_name="research_fidelity - Haiku",
 )
