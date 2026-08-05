@@ -16,9 +16,30 @@ You will be given:
 - The research TOPIC it was assigned
 - How many exa_search calls it made
 - A SEARCH TRACE: each exa_search call's arguments (main_query, guiding_query,
-  domain_scope) paired with the results it returned (source URLs and highlighted
-  excerpts). This is the ONLY evidence the Sub-Agent had — grade relative to it.
-- The FINDINGS: the report the Sub-Agent submitted via submit_findings
+  domain_scope) paired with the results it returned — each result's citation
+  number, title, host site, and highlighted excerpts. This is the ONLY evidence
+  the Sub-Agent had — grade relative to it.
+- The FINDINGS: the report the Sub-Agent produced via record_findings
+
+═══════════════════════════════════════════════════════════════
+HOW THE SUB-AGENT WORKED
+═══════════════════════════════════════════════════════════════
+It does not read everything and then write. On each turn it distils the results
+in front of it into a partial report and issues its next search; those raw
+excerpts are then dropped from its context, and the final report is a merge of
+the partials it wrote along the way. Three consequences for grading:
+
+- The trace you are given is the complete evidence, but the Sub-Agent never saw
+  all of it at once. That does NOT lower the bar. A finding the trace supports
+  but the report lost is still a recall gap under Dimension 2 — detecting that
+  loss is precisely what this eval is for. Never excuse it as a side effect of
+  how the loop works.
+- It is shown a citation NUMBER, a title and a host for each result — never a
+  full URL. It cannot copy, invent, or tidy a URL, so URLs are not gradeable.
+- It does not write the SOURCES section. The harness renders that from the
+  numbers the report cites, filling in URLs the Sub-Agent never saw. Treat any
+  SOURCES block in the report as machine output: never grade its wording, its
+  presence, or its absence.
 
 Grade in three dimensions, each on its own evidence. Where one dimension already
 charges a failure, the others must not charge it again — the rubrics below say
@@ -66,8 +87,8 @@ empty yield is not the Sub-Agent's fault:
 - Dimension 1: count it against the budget, and treat a follow-up search issued
   after a failure as legitimate, not redundant.
 - Dimension 2: never charge its missing content as a recall gap.
-- Dimension 3: it returned no URLs and no highlights, so nothing in it can
-  support a citation.
+- Dimension 3: it returned no numbered results and no highlights, so nothing in
+  it can support a citation.
 
 ═══════════════════════════════════════════════════════════════
 DIMENSION 1 — SEARCH STRATEGY EFFICIENCY  (score: search_strategy_*)
@@ -132,8 +153,8 @@ calls; most topics resolve in 1–3.
   under-searching.
 - STOPPING AT 4 OR 5 SEARCHES IS INSTRUCTED BEHAVIOR, NEVER A FAULT. The
   Sub-Agent is told that once it has spent 4 searches it must write the report
-  with what it has, because running out of turns before submitting means the
-  Supervisor gets no report at all. Never flag premature_stop against a run that
+  with what it has, because a report it assembled itself is worth more than the
+  raw notes the harness falls back on. Never flag premature_stop against a run that
   stopped at 4 or 5, even when a visible gap remains, provided that gap is
   declared under GAPS. Reserve premature_stop for a run that stopped at 3 or
   fewer while the trace shows an obvious, unaddressed gap it had both the budget
@@ -168,13 +189,14 @@ summary, no commentary on its own process. The skeleton:
   TOPIC: <one line, the topic as the Sub-Agent interpreted it>
   KEY FINDINGS — self-contained claims, each carrying citation number(s)
   <THEMATIC HEADING> — optional further groupings, same citation rule
-  SOURCES — [n] <url copied verbatim> — one clause on what it contributed
   GAPS — what the topic needed that search did not return
+
+A SOURCES block appended after this is harness output, not part of the shape the
+Sub-Agent is graded on. Ignore it here.
 
 Findings are grouped by theme, not by search, with duplicates merged into one
 line carrying all supporting numbers. Empty sections are dropped, never emitted
-with placeholders. SOURCES lists only sources actually cited and is never empty
-when findings exist; GAPS is required whenever a gap exists. Adjacent material is
+with placeholders. GAPS is required whenever a gap exists. Adjacent material is
 left out or held to one ADJACENT / OUT OF SCOPE line. Quotes are reserved for
 wording that matters, marked and attributed; scripture references appear exactly
 as the source gave them, tied to the position cited for, never with verse text.
@@ -209,7 +231,6 @@ REPORT'S REQUIRED SHAPE above, check that:
 - the skeleton is followed and its sections are recognizable;
 - empty sections are dropped, not emitted with a placeholder underneath;
 - there is no preamble, closing summary, or commentary on its own process;
-- SOURCES is present and non-empty whenever findings exist;
 - GAPS is present whenever a gap exists (see honesty, below);
 - quotes are marked and attributed rather than blended into paraphrase;
 - scripture references are carried as the source gave them, with no verse text
@@ -257,23 +278,27 @@ Core Constraint stated above: no verse citation, date, council, quote, number, o
 attributed claim may appear unless it came back from search. Do NOT grade report
 formatting here — that belongs to Dimension 2.
 
-Your ground truth is the SEARCH TRACE: the URLs and highlighted excerpts it
-returned are the complete set of evidence the Sub-Agent was allowed to use.
+Your ground truth is the SEARCH TRACE: the numbered results and highlighted
+excerpts it returned are the complete set of evidence the Sub-Agent was allowed
+to use.
 
-Check five things:
+Do NOT grade URLs. The Sub-Agent is never shown one and cannot write one; the
+SOURCES block is rendered by the harness. There is no such thing as a fabricated
+URL in this system any more, and flagging one is a grading error.
+
+Check four things:
 
 coverage — every claim in the report carries at least one citation number. A
 claim with no number is an uncited assertion (flag uncited_claim). Section
 headings and an honest "GAPS" note are not claims and need no citation.
 
-resolvability — each citation number is defined exactly once in SOURCES. A number
-used but never defined, or defined twice, is unresolvable (flag
-unresolvable_citation).
-
-url authenticity — every URL in SOURCES must appear among the URLs the trace
-actually returned. A URL that does not is invented, whether it was fabricated
-outright, "corrected," or tidied up (flag fabricated_url). The Sub-Agent may not
-invent, correct, or clean up a URL under any circumstance.
+resolvability — every citation number in the report must be one the trace
+actually issued. Numbers are assigned by the harness and stay fixed for the
+whole run, so a report citing a number that appears nowhere in the trace has
+invented its support: the harness silently drops that number from SOURCES and
+the claim reaches the Supervisor with nothing behind it (flag
+unresolvable_citation). Cross-check numbers against the trace, not against the
+report's own SOURCES block.
 
 faithfulness — each cited claim must accurately represent what that source's
 returned highlight actually supports. A claim that overreaches, distorts, states
@@ -289,27 +314,28 @@ Sub-Agent is not this system's source of truth, the research is (flag
 unsourced_fact). "Filling in the gaps" from memory is the archetypal violation.
 
 Score:
-- 1.0 "sound" — every claim cited, every number resolvable, every URL present in
-  the trace, claims faithful to their highlights, no leaked facts.
-- 0.66 "minor_issues" — isolated lapses (one uncited claim, one number defined
-  twice or used undefined) but no misrepresentation, no invented URL, and no
-  leaked facts.
+- 1.0 "sound" — every claim cited, every number traceable to a returned result,
+  claims faithful to their highlights, no leaked facts.
+- 0.66 "minor_issues" — isolated lapses (one uncited claim, one stray number)
+  but no misrepresentation and no leaked facts.
 - 0.33 "unsound" — a cited claim materially misrepresents its source, or several
   claims are uncited, or citation numbering is broken badly enough that the
   Supervisor cannot trace claims back to sources.
 - 0.0 "fabrication" — one or more specific facts asserted with no returned source
-  behind them (training-data leakage), OR any URL not present in the trace. Both
-  are the system-level failure the Core Constraint exists to prevent.
+  behind them (training-data leakage). This is the system-level failure the Core
+  Constraint exists to prevent.
 
-A URL absent from the trace is ALWAYS 0.0 "fabrication," never 0.33 — an invented
-source is categorically worse than a bookkeeping slip, and nothing downstream can
-detect it.
+Leakage is the failure to watch for now, and the loop makes it likelier than it
+looks: by the time the Sub-Agent writes its final report, the early excerpts are
+gone from its context and it is merging its own notes. A confident, specific
+claim carrying an early citation number is exactly where a remembered fact can
+enter unnoticed. Check such claims against the trace especially closely.
 
 List every offending span in `citation_flagged_items`, one entry per span, in
 the format `<flag>: '<exact text>' — <why>` (e.g. "unsourced_fact: 'the Council
 of Ephesus in 431' — no returned highlight mentions this"). Allowed flags, and
-only these: uncited_claim, unresolvable_citation, fabricated_url,
-misrepresented_source, unsourced_fact.
+only these: uncited_claim, unresolvable_citation, misrepresented_source,
+unsourced_fact.
 
 ═══════════════════════════════════════════════════════════════
 DEGRADED RUNS
@@ -324,6 +350,21 @@ trace shows (none → the NO SEARCHES AT ALL rule); Dimension 2 is `inadequate`;
 Dimension 3 is `fabrication`, with `citation_flagged_items` left EMPTY and
 `citation_integrity_rationale` stating that the verdict reflects an absent report
 rather than any fabricated span.
+
+MERGED PARTIALS is the other degraded shape, and it is NOT an empty report.
+REPORT SOURCE tells you which you have. When it reads "partials", the Sub-Agent
+never got to write a finished report — the run hit the search ceiling, the step
+backstop, or an LLM error first — and the harness handed back the working notes
+it had banked instead. Those notes were never meant to be read as one document:
+expect repeated headings, several TOPIC lines, and findings that are not merged
+across searches.
+
+Do NOT charge that against Dimension 2's format compliance. The Sub-Agent did not
+assemble it and no format decision of its own produced it. Grade coverage and
+honesty on the content as normal; grade shape only on what the individual notes
+look like, not on the seams between them. Say in `reasoning` that the report was
+a partial merge. Dimension 1 still charges whatever caused the run to be cut
+short — a budget overrun is a strategy failure, and it is charged there.
 
 LLM ERROR is a separate signal, and it changes who is at fault. When it is
 anything other than "(none)", the Sub-Agent's model call gave up mid-run: the
@@ -361,8 +402,15 @@ is the only evidence the Sub-Agent actually had):
 {search_trace}
 
 ---
-FINDINGS (the report submitted via submit_findings):
+FINDINGS (the report produced via record_findings; any SOURCES block at the end
+is harness output, not the Sub-Agent's writing):
 {findings}
+
+---
+REPORT SOURCE ("full" = the Sub-Agent wrote and submitted a finished report;
+"partials" = the run was cut short and the harness merged its banked notes;
+"none" = no report at all):
+{findings_source}
 
 ---
 LLM ERROR (set when the Sub-Agent's model call gave up; "(none)" on a normal run):

@@ -59,7 +59,9 @@ def summarize(result: dict) -> str:
 
 
 if __name__ == "__main__":
-    query = "What is catholic teaching on the Trinity?"
+    query = """The Catholic Church's magisterial and scriptural basis for the
+            dogma of the Immaculate Conception of Mary, including Ineffabilis 
+            Deus and the reasoning offered for it"""
     result = test_search_subagent(query)
 
     print(summarize(result), "\n")

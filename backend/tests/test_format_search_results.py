@@ -6,7 +6,13 @@ that: a missing field rendering as "None", a full url leaking into view, and
 the numbering the citations point at.
 """
 
-from agent.subagent import _format_search_results, _source_ledger
+from agent.subagent import (
+    NEXT_TURN_REMINDER,
+    _format_search_results,
+    _source_ledger,
+    _stub_search_message,
+)
+from langchain_core.messages import ToolMessage
 
 
 def _ledger(*urls):
@@ -85,3 +91,49 @@ def test_url_less_result_is_marked_uncitable():
     assert "[1] TITLE: A" in out
     assert "[-] TITLE: B" in out
     assert "[2]" not in out
+
+
+def test_results_close_with_the_next_turn_reminder():
+    # The rule is in SUBAGENT_SYSTEM_PROMPT too, and the model ignores it there.
+    # Restating it on the message read immediately before the decision is what
+    # takes the fused report+search turn from 1/6 to 6/6.
+    out = _format_search_results([{"title": "A", "url": "a"}], _ledger("a"))
+
+    assert out.endswith(NEXT_TURN_REMINDER)
+
+
+def test_reminder_offers_both_branches_not_just_the_fused_one():
+    # A reminder that only ever said "call both" would never let the model emit
+    # the lone full report that ends the run, burning the budget every time.
+    assert 'report_type="partial"' in NEXT_TURN_REMINDER
+    assert 'report_type="full"' in NEXT_TURN_REMINDER
+
+
+def test_reminder_does_not_survive_stubbing():
+    # Stubs are rebuilt from the "[n] TITLE:" lines alone, so the reminder drops
+    # out on its own. If it ever leaked through, every stubbed result set would
+    # carry a stale copy and the reminder would stop marking the live one.
+    rendered = _format_search_results(
+        [{"title": "A", "url": "a", "highlights": ["h"]}], _ledger("a")
+    )
+    stubbed = _stub_search_message(
+        ToolMessage(content=rendered, tool_call_id="c1", name="exa_search", id="t1")
+    )
+
+    assert stubbed is not None
+    assert NEXT_TURN_REMINDER not in stubbed.content
+    assert "[1] A" in stubbed.content
+
+
+def test_reminder_is_not_parsed_as_a_result_of_its_own():
+    # It sits in the same message as the rendered hits, so any line looking like
+    # a result head would show up in the stub as a phantom source.
+    rendered = _format_search_results(
+        [{"title": "A", "url": "a"}, {"title": "B", "url": "b"}], _ledger("a", "b")
+    )
+    stubbed = _stub_search_message(
+        ToolMessage(content=rendered, tool_call_id="c1", name="exa_search", id="t1")
+    )
+
+    # Two results in, two lines out — the reminder adds none.
+    assert len([ln for ln in stubbed.content.splitlines() if ln.startswith("  [")]) == 2

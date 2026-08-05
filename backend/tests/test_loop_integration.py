@@ -204,10 +204,19 @@ def test_search_trace_keeps_what_the_model_was_shown(run_loop):
     # survives even though the messages no longer carry it.
     result, _ = run_loop(SCRIPT)
 
-    trace = "\n".join(result["search_trace"])
+    trace = "\n".join(entry["results"] for entry in result["search_trace"])
 
     assert "excerpt-1-alpha" in trace
     assert "excerpt-2-alpha" in trace
+
+
+def test_search_trace_is_keyed_by_the_call_it_answers(run_loop):
+    # The eval pairs each search's arguments with its results. Keying on the
+    # call id rather than on position is what keeps that pairing right when a
+    # search fails and contributes no entry at all.
+    result, _ = run_loop(SCRIPT)
+
+    assert [entry["tool_call_id"] for entry in result["search_trace"]] == ["s1", "s2"]
 
 
 def test_only_search_results_are_ever_rewritten(run_loop):

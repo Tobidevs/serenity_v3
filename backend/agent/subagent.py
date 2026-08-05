@@ -22,10 +22,13 @@ def _subagent_model():
     model = init_chat_model(
         "gpt-5.4-mini",
         model_provider="openai",
-        temperature=0,
-
+        reasoning={"effort": "low"},
+        use_responses_api=True,
+        output_version="responses/v1",
     )
-    return with_llm_retry(model.bind_tools([exa_search, record_findings]))
+    return with_llm_retry(
+        model.bind_tools([exa_search, record_findings], parallel_tool_calls=True)
+    )
 
 def build_user_message(topic: str) -> str:
     """Frame the Supervisor's research topic as the sub-agent's assignment.
@@ -128,6 +131,27 @@ STUB_MARKER = "[results consumed into a partial report]"
 # records somewhere on the side.
 _RENDERED_HEAD = re.compile(r"^\[(\d+|-)\] TITLE: (.*)$", re.MULTILINE)
 
+# The loop rule from step 3 of SUBAGENT_SYSTEM_PROMPT, restated on every fresh
+# result set. It is already in the system prompt, and the model ignores it there:
+# at reasoning effort "low" it does not carry that rule across the whole context
+# to the point of decision. Measured over 6 trials against gpt-5.4-mini, the
+# report+search turn fires 1/6 on the system prompt alone and 6/6 with this
+# attached to the results the model is reading.
+#
+# Both branches are spelled out on purpose. A reminder that only ever said "call
+# both" would keep the loop alive until the search budget ran out, since the
+# model would never emit the lone full report that ends the run.
+#
+# Stubbing drops this for free: _stub_search_message rebuilds content from the
+# `[n] TITLE:` lines alone, so the reminder never survives into a stub and the
+# cache divergence point does not move.
+NEXT_TURN_REMINDER = """NEXT TURN — decide now, and act with tool calls in this one turn:
+  - Gaps remain -> call record_findings(report_type="partial", ...) covering the
+    results above AND exa_search(...) going after the gap, both in this same turn.
+  - Research is finished -> call record_findings(report_type="full", ...) alone.
+A reply with no tool call is discarded, and a partial with no search beside it
+ends the run."""
+
 # Citation markers in a finished report, used to list only what it actually cites.
 _CITATION = re.compile(r"\[(\d+)\]")
 
@@ -178,6 +202,10 @@ def _format_search_results(records: list[dict], ledger: dict[str, int]) -> str:
     wrong. The host is kept because the prompt asks the model to note a
     source's own stance, and that is most of what the host tells it. A record
     with no url is marked `[-]`: uncitable, and the prompt says to leave it be.
+
+    The rendered results close with NEXT_TURN_REMINDER. The model reads this
+    message immediately before choosing its next turn, and that placement is what
+    makes the rule stick — see the constant for the measurements.
     """
     blocks = []
     for record in records:
@@ -195,6 +223,7 @@ def _format_search_results(records: list[dict], ledger: dict[str, int]) -> str:
             lines.append("    HIGHLIGHTS: (none)")
         blocks.append("\n".join(lines))
 
+    blocks.append(NEXT_TURN_REMINDER)
     return "\n\n".join(blocks)
 
 
@@ -328,7 +357,10 @@ def llm_node(state: SubAgentState) -> dict:
     for message, records in fresh:
         rendered = _format_search_results(records, ledger)
         replacements[message.id] = _replace(message, rendered)
-        trace.append(rendered)
+        # Tagged with the call it answers, not just appended: a failed search
+        # never gets rendered, so anything pairing these up by position would
+        # slide out of step with the searches actually issued.
+        trace.append({"tool_call_id": message.tool_call_id, "results": rendered})
 
     for message in _reported_search_messages(messages):
         # Anything rendered above belongs to this turn, so it is newer than the
@@ -440,6 +472,7 @@ def process_search_results(state: SubAgentState) -> dict:
     result: dict = {"final_sources": unique}
 
     report = None
+    source = "full"
     last_ai = _latest_ai_message(state["messages"])
     if last_ai is not None and last_ai.tool_calls:
         call = _report_call(last_ai)
@@ -451,9 +484,12 @@ def process_search_results(state: SubAgentState) -> dict:
         # only ever runs when there was no full report to prefer.
         partials = [p for p in state.get("partial_reports", []) if p and p.strip()]
         report = "\n\n".join(partials) if partials else None
+        source = "partials"
 
     if not report:
         return result
+
+    result["findings_source"] = source
 
     sources_block = _render_sources(report, state.get("sources", []))
     result["findings"] = [f"{report}\n\n{sources_block}" if sources_block else report]

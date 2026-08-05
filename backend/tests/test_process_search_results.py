@@ -87,6 +87,25 @@ def test_banked_partials_are_published_when_no_full_report_was_written():
     assert result["findings"] == ["first\n\nsecond"]
 
 
+def test_findings_source_distinguishes_a_written_report_from_merged_notes():
+    # The two read very differently — merged notes repeat headings and have no
+    # single TOPIC line — so the eval's judge has to be told which it is
+    # grading rather than charging the seams against the sub-agent's formatting.
+    written = process_search_results(
+        _state(messages=[ai([report("full", findings="the report")])])
+    )
+    merged = process_search_results(_state(partial_reports=["one", "two"]))
+
+    assert written["findings_source"] == "full"
+    assert merged["findings_source"] == "partials"
+
+
+def test_no_report_publishes_no_findings_source():
+    result = process_search_results(_state())
+
+    assert "findings_source" not in result
+
+
 def test_blank_partials_are_not_published_as_a_report():
     # Guards against emitting [""] — downstream would render it as a blank
     # section rather than as "this run found nothing".

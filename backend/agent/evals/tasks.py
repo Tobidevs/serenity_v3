@@ -19,21 +19,30 @@ def planner_eval_task(input):
     }
 
 
-def _extract_search_trace(messages: list) -> tuple[str, int]:
+def _extract_search_trace(messages: list, search_trace: list[dict]) -> tuple[str, int]:
     """Pair each exa_search call's arguments with the results it returned.
 
     The sub-agent's queries (main_query/guiding_query/domain_scope) live only in
-    the AIMessage tool_calls, and the returned url+highlights live in the
-    corresponding exa_search ToolMessage (already rendered by
-    _format_search_results, favicon stripped). The judge needs both — the args
-    to grade search strategy, the returned highlights to verify citations — so
-    we correlate them by tool_call_id and render one block per search.
+    the AIMessage tool_calls. The results do NOT live in the messages any more:
+    once a report covers a result set, the loop overwrites that ToolMessage with
+    a short index and the excerpts are gone. Grading against the messages would
+    show the judge "[results consumed into a partial report]" for every search
+    but the last, and it would score the report as uncited against evidence it
+    could no longer see.
+
+    `search_trace` is the snapshot taken before that overwrite, keyed by the
+    call it answers. The messages are still the fallback: a search that FAILED
+    is never rendered and so never reaches the trace, and its error text is
+    exactly what the judge needs to see to forgive the empty yield.
     """
     results_by_id = {
         m.tool_call_id: m.content
         for m in messages
         if isinstance(m, ToolMessage) and m.name == "exa_search"
     }
+    results_by_id.update(
+        {entry["tool_call_id"]: entry["results"] for entry in search_trace}
+    )
 
     blocks: list[str] = []
     n = 0
@@ -81,11 +90,15 @@ def research_eval_task(input):
             "steps": 0,
             "findings": [],
             "final_sources": [],
+            "partial_reports": [],
+            "search_trace": [],
         }
     )
 
     messages = result.get("messages", [])
-    search_trace, num_searches = _extract_search_trace(messages)
+    search_trace, num_searches = _extract_search_trace(
+        messages, result.get("search_trace", [])
+    )
 
     return {
         "topic": input["topic"],
@@ -95,4 +108,9 @@ def research_eval_task(input):
         "final_sources": result.get("final_sources", []),
         "steps": result.get("steps", 0),
         "llm_error": result.get("llm_error"),
+        "findings_source": result.get("findings_source") or "none",
+        # Not shown to the judge, which grades the finished report. Recorded so
+        # a bad score can be traced to the turn that lost the information —
+        # whether the distillation dropped it or the final merge did.
+        "partial_reports": result.get("partial_reports", []),
     }

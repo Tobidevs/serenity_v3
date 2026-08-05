@@ -44,7 +44,7 @@ class ResearchJudgeOutput(BaseModel):
     )
     citation_integrity_rationale: str = Field(description="Rationale for the citation integrity verdict")
     citation_flagged_items: list[str] = Field(
-        description="Exact offending spans, one entry per span, formatted \"<flag>: '<exact text>' — <why>\", with the flag drawn only from: uncited_claim, unresolvable_citation, fabricated_url, misrepresented_source, unsourced_fact"
+        description="Exact offending spans, one entry per span, formatted \"<flag>: '<exact text>' — <why>\", with the flag drawn only from: uncited_claim, unresolvable_citation, misrepresented_source, unsourced_fact"
     )
 
 
@@ -77,6 +77,7 @@ def research_fidelity(input, output, expected=None, metadata=None):
         search_trace=output.get("search_trace") or "(no searches were issued)",
         findings=output.get("findings") or "(no findings were submitted)",
         llm_error=output.get("llm_error") or "(none)",
+        findings_source=output.get("findings_source") or "none",
     )
 
     result: ResearchJudgeOutput = _research_judge_model().invoke(
