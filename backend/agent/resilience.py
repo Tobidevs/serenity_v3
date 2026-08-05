@@ -7,7 +7,7 @@ exponential backoff before the call is considered lost. `safe_invoke` runs the
 call and turns anything that still escapes into `LLMCallFailed`, logging it once
 at the point of failure so nodes only have to decide how to degrade.
 
-Note both provider clients do their own retrying underneath (`max_retries=2` by
+Note the Anthropic client does its own retrying underneath (`max_retries=2` by
 default), so a call that exhausts MAX_ATTEMPTS here has been attempted several
 times over. That is intentional belt-and-braces, not a bug — but it means a
 genuinely dead API takes a while to give up, which is why callers degrade
@@ -25,13 +25,6 @@ from anthropic import (
 )
 from langchain_core.runnables import Runnable
 
-# Both SDKs export these names, so the OpenAI ones are aliased. The agent spans
-# both providers (Anthropic planner, OpenAI sub-agent) and a retry tuple that
-# covers only one of them silently stops retrying for the other.
-from openai import APIConnectionError as OpenAIAPIConnectionError
-from openai import InternalServerError as OpenAIInternalServerError
-from openai import RateLimitError as OpenAIRateLimitError
-
 logger = logging.getLogger(__name__)
 
 # Failures worth another attempt: the network dropped, or the API asked us to
@@ -43,12 +36,7 @@ RETRYABLE_EXCEPTIONS = (
     APIConnectionError,
     RateLimitError,
     InternalServerError,
-    # OverloadedError is Anthropic-only; OpenAI signals the same condition with
-    # a 429, which RateLimitError already covers.
     OverloadedError,
-    OpenAIAPIConnectionError,
-    OpenAIRateLimitError,
-    OpenAIInternalServerError,
 )
 
 MAX_ATTEMPTS = 3

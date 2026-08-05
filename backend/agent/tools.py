@@ -54,29 +54,15 @@ def exa_search(main_query: str, guiding_query: str, domain_scope: list[str]):
 
 
 @tool
-def think(thought: str):
+def think(thought: str, next_action: Literal["search_again", "stop_and_report"]):
     """Log a reasoning step and declare whether to keep searching or report."""
     return "Reasoning Logged."
 
 
 @tool
-def record_findings(
-    report_type: Literal["partial", "full"],
-    findings: str,
-    next_steps: str = "",
-):
-    """Record what the searches returned so far, distilled to findings.
-
-    Args:
-        report_type: "partial" when the topic still has gaps and another search
-            is coming, "full" when this is the finished report. A full report
-            ends the run.
-        findings: The report itself, formatted per the system prompt. On a
-            partial this covers only the results just returned.
-        next_steps: What the accompanying search is meant to close. Ignored on
-            a full report.
-    """
-    return "Findings recorded."
+def submit_findings(findings: str):
+    """Signal that research is complete and findings are ready to report."""
+    return "Findings Submitted"
 
 
 @tool

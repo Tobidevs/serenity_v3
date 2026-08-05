@@ -18,20 +18,6 @@ def call(call_id, name="exa_search", args=None):
     return {"id": call_id, "name": name, "args": args or {}}
 
 
-def report(report_type="partial", findings="notes", call_id="r"):
-    """A record_findings tool call. `report_type=None` omits the arg entirely."""
-    args = {"findings": findings}
-    if report_type is not None:
-        args["report_type"] = report_type
-    return call(call_id, name="record_findings", args=args)
-
-
-def tool(tool_call_id, name="exa_search", content="result", id=None):
-    """ToolMessage answering the call with the given id.
-
-    `id` is what add_messages overwrites on, so any test about rewriting a
-    message in place has to set it.
-    """
-    return ToolMessage(
-        content=content, tool_call_id=tool_call_id, name=name, id=id
-    )
+def tool(tool_call_id, name="exa_search", content="result"):
+    """ToolMessage answering the call with the given id."""
+    return ToolMessage(content=content, tool_call_id=tool_call_id, name=name)

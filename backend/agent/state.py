@@ -52,15 +52,6 @@ class SubAgentState(TypedDict, total=False):
     # increments it. Backstops the loop against a model that never finishes.
     steps: Annotated[int, operator.add]
     findings: Annotated[list[str], operator.add]
-    # One entry per record_findings call, appended as the loop runs. The raw
-    # search results are stubbed out of `messages` once a report covers them,
-    # so these are the only surviving record of what the early searches found —
-    # and what every exit path falls back on when no full report was written.
-    partial_reports: Annotated[list[str], operator.add]
-    # The rendered search results as the model saw them, snapshotted before
-    # they are stubbed. Nothing reads this yet; it exists so the eval's judge
-    # can still be shown the evidence the report was built from.
-    search_trace: Annotated[list[str], operator.add]
     # Set when the sub-agent's LLM call gives up. Ends the loop via
     # `route_after_llm` and tells the caller the findings are short because the
     # model became unreachable, not because the research came up empty.
